@@ -14,9 +14,11 @@ class InterdependentNetworkEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
     def __init__(self, network: nx.Graph, fa: float = 0.05, p: float = 1, render_mode: Optional[str] = None):
         self.network = network  # 相依网络
         # self.network_adj = np.array(nx.adjacency_matrix(self.network).todense())
+        self.G1 = self.network.subgraph([node[0] for node in self.network.nodes.items() if node[0].startswith('G1')])
+        self.G2 = self.network.subgraph([node[0] for node in self.network.nodes.items() if node[0].startswith('G2')])
         self.generation_size = 40  # 种群大小
 
-        self.idx2adj = genome_extraction(self.network)  # 加边网络侧的空位对应关系
+        self.idx2adj = genome_extraction(self.G1)  # 加边网络侧的空位对应关系
         self.L = len(self.idx2adj)  # 编码长度
         self.l = round(fa * self.L)  # 目标加边数量
         self.render_mode = render_mode
@@ -67,7 +69,7 @@ class InterdependentNetworkEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
         if self.render_mode == "human":
             self.render()
 
-        return np.array(self.state, dtype=np.float32), reward, terminated, False, {}
+        return np.array(self.state, dtype=np.float32), reward, terminated, False, {"fitness": self.state_fit}
 
     def reset(
             self,
@@ -95,6 +97,8 @@ class InterdependentNetworkEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
 
     def sample(self) -> list:
         return [i * 0.05 * math.pi for i in self.action_space.sample((self.L, None))]
+
+
 
 
 def random_init_genome(l: int, L: int) -> np.ndarray:
@@ -174,20 +178,52 @@ def robustness(network: nx.Graph) -> int:
     :return:
     """
 
+    G1 = network.subgraph([node[0] for node in network.nodes.items() if node[0].startswith('G1')])
+    G2 = network.subgraph([node[0] for node in network.nodes.items() if node[0].startswith('G2')])
+
     while True:
+        cc1 = list(nx.connected_components(G1))
+        cc2 = list(nx.connected_components(G2))
+
+        cc1.sort(key=len)
+        cc2.sort(key=len)
+
+        cc1 = cc1[:-1]
+        cc2 = cc2[:-1]
+
         s = set()
 
-        for node in network.nodes:
-            if network.degree(node) == 1 \
-                    or len([neighbor for neighbor in network.neighbors(node) if
-                            not neighbor.startswith(node.split('-')[0])]) == 0:
+        for t in cc1:
+            for node in t:
                 s.add(node)
+                s.add(network.nodes[node]['inter_node'])
+
+        for t in cc2:
+            for node in t:
+                s.add(node)
+                s.add(network.nodes[node]['inter_node'])
 
         if len(s) == 0:
             break
 
         for node in s:
             network.remove_node(node)
+
+
+
+        # s = set()
+        #
+        # for node in network.nodes:
+        #     if network.degree(node) == 1 \
+        #             or len([neighbor for neighbor in network.neighbors(node) if
+        #                     not neighbor.startswith(node.split('-')[0])]) == 0:
+        #         s.add(node)
+        #
+        # if len(s) == 0:
+        #     break
+        #
+        # for node in s:
+        #     network.remove_node(node)
 
     return len(network.nodes)
 
@@ -200,14 +236,15 @@ def evaluation(network: nx.Graph):
     """
     res = 0
     # 生成随机攻击序列
-    attack_node_set = list(range(100))
+    attack_node_set = list(range(10))
     np.random.shuffle(attack_node_set)
 
     for node in attack_node_set:
+        network.remove_node(network.nodes[f'G1-{node}']['inter_node'])
         network.remove_node(f'G1-{node}')
         res += robustness(network.copy())  # TODO: 计算鲁棒性
 
-    return res / 100
+    return res / 10
 
 
 def fitness(network: nx.Graph, l: int, L: int, idx2adj: list, genome: np.ndarray, generation_size: int) -> float:
@@ -239,12 +276,8 @@ def genome_extraction(network: nx.Graph) -> list:
     :param network:
     :return:
     """
-    # 获取加边网络子图
-    node_list = [node[0] for node in network.nodes.items() if node[0].startswith('G1')]
-    edged_network = network.subgraph(node_list)
-
     # 转换成邻接矩阵
-    edged_network_adj = np.array(nx.adjacency_matrix(edged_network).todense())
+    edged_network_adj = np.array(nx.adjacency_matrix(network).todense())
 
     # 遍历邻接矩阵
     res = []
