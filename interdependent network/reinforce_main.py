@@ -66,3 +66,9 @@ if __name__ == "__main__":
                             '%.3f' % np.mean(return_list[-10:])
                     })
                 pbar.update(1)
+
+    episodes_list = list(range(len(return_list)))
+    plt.plot(episodes_list, return_list)
+    plt.xlabel('Episodes')
+    plt.ylabel('Returns')
+    plt.show()

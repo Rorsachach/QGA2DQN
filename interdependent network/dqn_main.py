@@ -3,11 +3,15 @@ import networkx as nx
 import numpy as np
 import random
 
+import math
+
 import env.InterdependentNetworkEnv as Env
 from DQN import *
 from networks.factory import Factory
 import matplotlib.pyplot as plt
 
+def modify_action(action: np.ndarray):
+    return [i * 0.05 * math.pi for i in action]
 
 if __name__ == "__main__":
     lr = 2e-3
@@ -30,7 +34,7 @@ if __name__ == "__main__":
     replay_buffer = ReplayBuffer(buffer_size)
     # state_dim = env.observation_space.shape[0]
     # action_dim = env.action_space.n
-    agent = DQN(env.L, hidden_dim, env.L, lr, gamma, epsilon,
+    agent = DQN(2, hidden_dim, 21, lr, gamma, epsilon,
                 target_update, device)
 
     return_list = []
@@ -41,8 +45,9 @@ if __name__ == "__main__":
                 state, info = env.reset(seed=0)
                 done = False
                 while not done:
-                    action = agent.take_action(state.T)
-                    next_state, reward, done, _, _ = env.step(action)
+                    action = agent.take_action(state)
+                    real_action = modify_action(action)
+                    next_state, reward, done, _, _ = env.step(real_action)
                     replay_buffer.add(state, action, reward, next_state, done)
                     state = next_state
                     episode_return += reward

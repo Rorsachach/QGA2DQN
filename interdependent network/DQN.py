@@ -1,3 +1,4 @@
+import math
 import random
 import numpy as np
 import collections
@@ -59,16 +60,16 @@ class DQN:
 
     def take_action(self, state):  # epsilon-贪婪策略采取动作
         if np.random.random() < self.epsilon:
-            action = np.random.randint(self.action_dim)
+            action = np.array(np.random.randint(0, 21, state.shape[0]))
         else:
-            state = torch.tensor([state], dtype=torch.float).to(self.device)
-            action = self.q_net(state).argmax().item()
+            state = torch.tensor(state, dtype=torch.float).to(self.device)
+            action = self.q_net(state).argmax(dim=1).numpy()
         return action
 
     def update(self, transition_dict):
         states = torch.tensor(transition_dict['states'],
                               dtype=torch.float).to(self.device)
-        actions = torch.tensor(transition_dict['actions']).view(-1, 1).to(
+        actions = torch.tensor(transition_dict['actions']).to(
             self.device)
         rewards = torch.tensor(transition_dict['rewards'],
                                dtype=torch.float).view(-1, 1).to(self.device)
@@ -77,10 +78,9 @@ class DQN:
         dones = torch.tensor(transition_dict['dones'],
                              dtype=torch.float).view(-1, 1).to(self.device)
 
-        q_values = self.q_net(states).gather(1, actions)  # Q值
+        q_values = self.q_net(states).gather(1, actions.reshape(actions.shape[0], actions.shape[1], 1)).reshape(actions.shape[0], actions.shape[1])  # Q值 self.q_net(states).gather(1, actions.reshape(43, 64, 1))
         # 下个状态的最大Q值
-        max_next_q_values = self.target_q_net(next_states).max(1)[0].view(
-            -1, 1)
+        max_next_q_values = self.target_q_net(next_states).max(2)[0]
         q_targets = rewards + self.gamma * max_next_q_values * (1 - dones
                                                                 )  # TD误差目标
         dqn_loss = torch.mean(F.mse_loss(q_values, q_targets))  # 均方误差损失函数
