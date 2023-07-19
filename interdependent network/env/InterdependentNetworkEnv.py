@@ -1,6 +1,7 @@
 import math
 
 import gym
+from gym import spaces
 import numpy as np
 
 from typing import Optional, Union
@@ -10,21 +11,24 @@ import networkx as nx
 
 class InterdependentNetworkEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
 
-    def __init__(self, network: nx.Graph, render_mode: Optional[str] = None):
+    def __init__(self, network: nx.Graph, fa: float = 0.05, p: float = 1, render_mode: Optional[str] = None):
         self.network = network  # 相依网络
         # self.network_adj = np.array(nx.adjacency_matrix(self.network).todense())
         self.generation_size = 40  # 种群大小
 
         self.idx2adj = genome_extraction(self.network)  # 加边网络侧的空位对应关系
-        self.length = len(self.idx2adj)  # 编码长度
+        self.L = len(self.idx2adj)  # 编码长度
+        self.l = round(fa * self.L)  # 目标加边数量
         self.render_mode = render_mode
 
         self.episode = 0  # 回合数
         self.state = None  # genome 基因编码
         self.state_fit = 0  # 适应度
 
-        self.l = 5
-        self.L = 0  # TODO:
+        self.p = p  # 随机攻击保留的节点数量
+
+        self.observation_space = spaces.Sequence(spaces.Box(np.array([0, 0]), np.array([1, 1])))
+        self.action_space = spaces.Sequence(spaces.Discrete(21, start=-10))
 
     def step(self, action: list):
         """
@@ -79,7 +83,7 @@ class InterdependentNetworkEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
         """
         super().reset(seed=seed)
 
-        self.state = random_init_genome(self.l, self.length)  # 初始化编码
+        self.state = random_init_genome(self.l, self.L)  # 初始化编码
         self.state_fit = fitness(self.network, self.l, self.L, self.idx2adj, self.state, self.generation_size)
 
         if self.render_mode == "human":
@@ -88,6 +92,9 @@ class InterdependentNetworkEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
 
     def render(self):
         pass
+
+    def sample(self) -> list:
+        return [i * 0.05 * math.pi for i in self.action_space.sample((self.L, None))]
 
 
 def random_init_genome(l: int, L: int) -> np.ndarray:
@@ -167,7 +174,22 @@ def robustness(network: nx.Graph) -> int:
     :return:
     """
 
-    return size
+    while True:
+        s = set()
+
+        for node in network.nodes:
+            if network.degree(node) == 1 \
+                    or len([neighbor for neighbor in network.neighbors(node) if
+                            not neighbor.startswith(node.split('-')[0])]) == 0:
+                s.add(node)
+
+        if len(s) == 0:
+            break
+
+        for node in s:
+            network.remove_node(node)
+
+    return len(network.nodes)
 
 
 def evaluation(network: nx.Graph):
@@ -183,7 +205,7 @@ def evaluation(network: nx.Graph):
 
     for node in attack_node_set:
         network.remove_node(f'G1-{node}')
-        res += robustness(network)  # TODO: 计算鲁棒性
+        res += robustness(network.copy())  # TODO: 计算鲁棒性
 
     return res / 100
 
