@@ -58,7 +58,7 @@ class InterdependentNetworkEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
         # 终止条件 episode 达到目标，或者适应度收敛
         terminated = bool(
             self.episode >= 200
-            or abs(state_fit - self.state_fit) < 0.01  # TODO: 不应该以此作为终止条件，需要再考虑一下
+            # or abs(state_fit - self.state_fit) < 0.01  # TODO: 不应该以此作为终止条件，需要再考虑一下
         )
 
         # 奖励值：如果适应度增高则 奖励 1，否则不奖励
@@ -87,6 +87,7 @@ class InterdependentNetworkEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
 
         self.state = random_init_genome(self.l, self.L)  # 初始化编码
         self.state_fit = fitness(self.network, self.l, self.L, self.idx2adj, self.state, self.generation_size)
+        self.episode = 0
 
         if self.render_mode == "human":
             self.render()
@@ -99,8 +100,6 @@ class InterdependentNetworkEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
         return [i * 0.05 * math.pi for i in self.action_space.sample((self.L, None))]
 
 
-
-
 def random_init_genome(l: int, L: int) -> np.ndarray:
     """
     state 初始化操作
@@ -108,20 +107,6 @@ def random_init_genome(l: int, L: int) -> np.ndarray:
     :param L:
     :return:
     """
-    # fix = np.array([1 / math.sqrt(2), 1 / math.sqrt(2)])
-    # state = np.empty([length, 2])
-    #
-    # for i in range(length):
-    #     theta = np.random.uniform(0, 1) * 90
-    #     theta = math.radians(theta)
-    #     rotate = np.array([
-    #         [math.cos(theta), -math.sin(theta)],
-    #         [math.sin(theta), math.cos(theta)]
-    #     ])
-    #
-    #     state[i] = rotate.dot(fix)
-    #
-    # return state
 
     return np.full([L, 2], [math.sqrt(1 - l / L), math.sqrt(l / L)])
 
@@ -206,11 +191,7 @@ def robustness(network: nx.Graph) -> int:
         if len(s) == 0:
             break
 
-        for node in s:
-            network.remove_node(node)
-
-
-
+        network.remove_nodes_from(s)
         # s = set()
         #
         # for node in network.nodes:
