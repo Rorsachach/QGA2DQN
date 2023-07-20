@@ -13,7 +13,11 @@ from networks.factory import Factory
 
 
 def modify_action(action: np.ndarray):
-    return [i * 0.05 * math.pi for i in action]
+    return [-0.5 * math.pi + i * 0.05 * math.pi for i in action]
+
+
+def preprocess_state(state: np.ndarray):
+    return state[:, 0]
 
 
 if __name__ == "__main__":
@@ -28,8 +32,9 @@ if __name__ == "__main__":
     # env.seed(0)
     torch.manual_seed(0)
 
-    agent = REINFORCE(2, hidden_dim, 21, learning_rate, gamma,
-                      device)
+    # agent = REINFORCE(2, hidden_dim, 21, learning_rate, gamma,
+    #                   device)
+    agent = REINFORCE(env.L, hidden_dim, env.L, learning_rate, gamma, device)
 
     return_list = []
     for i in range(10):
@@ -44,11 +49,14 @@ if __name__ == "__main__":
                     'dones': []
                 }
                 state, info = env.reset()
+                state = preprocess_state(state)
                 done = False
                 while not done:
                     action = agent.take_action(state)
-                    real_action = modify_action(action)
-                    next_state, reward, done, _, info = env.step(real_action)
+                    # real_action = modify_action(action)
+                    # next_state, reward, done, _, info = env.step(real_action)
+                    next_state, reward, done, _, info = env.step(action)
+                    next_state = preprocess_state(next_state)
                     transition_dict['states'].append(state)
                     transition_dict['actions'].append(action)
                     transition_dict['next_states'].append(next_state)
@@ -71,4 +79,5 @@ if __name__ == "__main__":
     plt.plot(episodes_list, return_list)
     plt.xlabel('Episodes')
     plt.ylabel('Returns')
+    plt.title('DQN on Independent Networks')
     plt.show()

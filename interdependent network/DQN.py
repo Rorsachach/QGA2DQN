@@ -60,7 +60,7 @@ class DQN:
 
     def take_action(self, state):  # epsilon-贪婪策略采取动作
         if np.random.random() < self.epsilon:
-            action = np.array(np.random.randint(0, 21, state.shape[0]))
+            action = np.array(np.random.randint(0, 3, state.shape[0]))
         else:
             state = torch.tensor(state, dtype=torch.float).to(self.device)
             action = self.q_net(state).argmax(dim=1).numpy()

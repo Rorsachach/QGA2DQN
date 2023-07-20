@@ -4,12 +4,12 @@ import numpy as np
 
 class Factory:
     @staticmethod
-    def generate_interdependent_network() -> nx.Graph:
-        er = nx.generators.erdos_renyi_graph(10, 0.04)
-        ba = nx.generators.barabasi_albert_graph(10, 2)
+    def generate_interdependent_network(seed=0) -> nx.Graph:
+        er = nx.generators.erdos_renyi_graph(5, 0.4, seed=seed)
+        ba = nx.generators.barabasi_albert_graph(5, 2, seed=seed)
 
         network = nx.union(er, ba, rename=('G1-', 'G2-'))
-        inter_edges = list(range(10))
+        inter_edges = list(range(5))
         np.random.shuffle(inter_edges)
 
         edges = []

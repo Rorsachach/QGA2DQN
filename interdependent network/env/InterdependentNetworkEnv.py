@@ -11,12 +11,11 @@ import networkx as nx
 
 class InterdependentNetworkEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
 
-    def __init__(self, network: nx.Graph, fa: float = 0.05, p: float = 1, render_mode: Optional[str] = None):
+    def __init__(self, network: nx.Graph, fa: float = 1, p: float = 1, render_mode: Optional[str] = None):
         self.network = network  # 相依网络
-        # self.network_adj = np.array(nx.adjacency_matrix(self.network).todense())
         self.G1 = self.network.subgraph([node[0] for node in self.network.nodes.items() if node[0].startswith('G1')])
         self.G2 = self.network.subgraph([node[0] for node in self.network.nodes.items() if node[0].startswith('G2')])
-        self.generation_size = 40  # 种群大小
+        self.generation_size = 10  # 种群大小
 
         self.idx2adj = genome_extraction(self.G1)  # 加边网络侧的空位对应关系
         self.L = len(self.idx2adj)  # 编码长度
@@ -38,8 +37,7 @@ class InterdependentNetworkEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
         :param action:
         :return:
         """
-        # err_msg = f"{action!r} ({type(action)}) invalid"
-        # assert a, err_msg
+
         assert self.state is not None, "Call reset before using step method"
 
         self.episode += 1  # 回合次数 + 1
@@ -57,12 +55,15 @@ class InterdependentNetworkEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
 
         # 终止条件 episode 达到目标，或者适应度收敛
         terminated = bool(
-            self.episode >= 200
+            self.episode >= 100
+            # or not any(action)
+            # or reward == 0
             # or abs(state_fit - self.state_fit) < 0.01  # TODO: 不应该以此作为终止条件，需要再考虑一下
         )
 
         # 奖励值：如果适应度增高则 奖励 1，否则不奖励
-        reward = 1 if state_fit > self.state_fit else 0
+        # reward = 10 if state_fit >= self.state_fit else -5
+        reward = state_fit - self.state_fit if not terminated else state_fit
 
         self.state_fit = state_fit  # 跟新 state_fit 记录
 
@@ -108,7 +109,21 @@ def random_init_genome(l: int, L: int) -> np.ndarray:
     :return:
     """
 
-    return np.full([L, 2], [math.sqrt(1 - l / L), math.sqrt(l / L)])
+    fix = np.array([math.sqrt(1 - l / L), math.sqrt(l / L)])
+    genome = np.empty([L, 2])
+
+    for i in range(L):
+        theta = np.random.uniform(0, 1) * 90
+        theta = math.radians(theta)
+        rotate = np.array([
+            [math.cos(theta), -math.sin(theta)],
+            [math.sin(theta), math.cos(theta)]
+        ])
+
+        genome[i] = rotate.dot(fix)
+
+    return genome
+    # return np.full([L, 2], [math.sqrt(1 - l / L), math.sqrt(l / L)])
 
 
 def determine(network: nx.Graph, l: int, L: int, gene: np.ndarray, idx2adj: list) -> nx.Graph:
@@ -122,17 +137,9 @@ def determine(network: nx.Graph, l: int, L: int, gene: np.ndarray, idx2adj: list
     :return:
     """
     # 进行随机坍缩
-    res = np.empty(len(gene))
+    res = np.empty(L)
     for idx, bit in enumerate(gene):
         res[idx] = 1 if np.random.uniform(0, 1) > pow(bit[0], 2) else 0
-
-    # for bit in gene:
-    #     tmp = np.random.uniform(0, 1)
-    #     res.append(1 if tmp > np.around(pow(bit[0], 2), 2) else 0)
-    #
-    #
-    #
-    # if
 
     length = np.sum(res == 1)  # 统计加边个数
     if length > l:  # 如果加边个数比目标加边个数更多
@@ -163,21 +170,22 @@ def robustness(network: nx.Graph) -> int:
     :return:
     """
 
-    G1 = network.subgraph([node[0] for node in network.nodes.items() if node[0].startswith('G1')])
-    G2 = network.subgraph([node[0] for node in network.nodes.items() if node[0].startswith('G2')])
+    G1 = network.subgraph([node[0] for node in network.nodes.items() if node[0].startswith('G1')])  # 加边网络
+    G2 = network.subgraph([node[0] for node in network.nodes.items() if node[0].startswith('G2')])  # 相依网络
 
     while True:
-        cc1 = list(nx.connected_components(G1))
-        cc2 = list(nx.connected_components(G2))
+        cc1 = list(nx.connected_components(G1))  # 计算加边网络的连通图
+        cc2 = list(nx.connected_components(G2))  # 计算相依网络连通图
 
-        cc1.sort(key=len)
-        cc2.sort(key=len)
+        cc1.sort(key=len)  # 排序
+        cc2.sort(key=len)  # 排序
 
-        cc1 = cc1[:-1]
+        cc1 = cc1[:-1]  # 获取所有非最大连通图
         cc2 = cc2[:-1]
 
         s = set()
 
+        # 获取节点
         for t in cc1:
             for node in t:
                 s.add(node)
@@ -188,23 +196,12 @@ def robustness(network: nx.Graph) -> int:
                 s.add(node)
                 s.add(network.nodes[node]['inter_node'])
 
+        # 没有可删除节点
         if len(s) == 0:
             break
 
+        # 删除所有非最大连通图的节点和相依节点
         network.remove_nodes_from(s)
-        # s = set()
-        #
-        # for node in network.nodes:
-        #     if network.degree(node) == 1 \
-        #             or len([neighbor for neighbor in network.neighbors(node) if
-        #                     not neighbor.startswith(node.split('-')[0])]) == 0:
-        #         s.add(node)
-        #
-        # if len(s) == 0:
-        #     break
-        #
-        # for node in s:
-        #     network.remove_node(node)
 
     return len(network.nodes)
 
@@ -217,15 +214,15 @@ def evaluation(network: nx.Graph):
     """
     res = 0
     # 生成随机攻击序列
-    attack_node_set = list(range(10))
+    attack_node_set = list(range(5))
     np.random.shuffle(attack_node_set)
 
     for node in attack_node_set:
-        network.remove_node(network.nodes[f'G1-{node}']['inter_node'])
-        network.remove_node(f'G1-{node}')
+        network.remove_node(network.nodes[f'G1-{node}']['inter_node'])  # 删除攻击节点的相依节点
+        network.remove_node(f'G1-{node}')  # 删除攻击节点
         res += robustness(network.copy())  # TODO: 计算鲁棒性
 
-    return res / 10
+    return res / 5
 
 
 def fitness(network: nx.Graph, l: int, L: int, idx2adj: list, genome: np.ndarray, generation_size: int) -> float:
