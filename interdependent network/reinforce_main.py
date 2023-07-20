@@ -28,7 +28,7 @@ if __name__ == "__main__":
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device(
         "cpu")
 
-    env = Env.InterdependentNetworkEnv(Factory.generate_interdependent_network())
+    env = Env.InterdependentNetworkEnv(Factory.generate_interdependent_network(), fa=0.2)
     # env.seed(0)
     torch.manual_seed(0)
 
@@ -37,6 +37,7 @@ if __name__ == "__main__":
     agent = REINFORCE(env.L, hidden_dim, env.L, learning_rate, gamma, device)
 
     return_list = []
+    info_list = []
     for i in range(10):
         with tqdm(total=int(num_episodes / 10), desc='Iteration %d' % i) as pbar:
             for i_episode in range(int(num_episodes / 10)):
@@ -65,6 +66,7 @@ if __name__ == "__main__":
                     state = next_state
                     episode_return += reward
                 return_list.append(episode_return)
+                info_list.append(info['fitness'])
                 agent.update(transition_dict)
                 if (i_episode + 1) % 10 == 0:
                     pbar.set_postfix({
@@ -79,5 +81,12 @@ if __name__ == "__main__":
     plt.plot(episodes_list, return_list)
     plt.xlabel('Episodes')
     plt.ylabel('Returns')
+    plt.title('DQN on Independent Networks')
+    plt.show()
+
+    episodes_list = list(range(len(info_list)))
+    plt.plot(episodes_list, info_list)
+    plt.xlabel('Episodes')
+    plt.ylabel('fitness')
     plt.title('DQN on Independent Networks')
     plt.show()

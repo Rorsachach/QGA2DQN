@@ -16,7 +16,7 @@ if __name__ == "__main__":
     num_episodes = 1000  # 训练次数
     hidden_dim = 128  # 隐藏层维度
     gamma = 0.98  # 折扣因子 [0, 1] 接近 1 关注长期累计奖励，接近 0 关注短期奖励
-    epsilon = 0.1  # 引入随机概率，防止陷入贪婪策略的局部最优解
+    epsilon = 0.01  # 引入随机概率，防止陷入贪婪策略的局部最优解
     target_update = 10  # 目标网络更新频率
     buffer_size = 10000  # 回放池大小
     minimal_size = 500  # 最小更新回放池大小

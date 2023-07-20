@@ -15,7 +15,7 @@ class InterdependentNetworkEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
         self.network = network  # 相依网络
         self.G1 = self.network.subgraph([node[0] for node in self.network.nodes.items() if node[0].startswith('G1')])
         self.G2 = self.network.subgraph([node[0] for node in self.network.nodes.items() if node[0].startswith('G2')])
-        self.generation_size = 10  # 种群大小
+        self.generation_size = 100  # 种群大小
 
         self.idx2adj = genome_extraction(self.G1)  # 加边网络侧的空位对应关系
         self.L = len(self.idx2adj)  # 编码长度
@@ -63,7 +63,8 @@ class InterdependentNetworkEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
 
         # 奖励值：如果适应度增高则 奖励 1，否则不奖励
         # reward = 10 if state_fit >= self.state_fit else -5
-        reward = state_fit - self.state_fit if not terminated else state_fit
+        # reward = state_fit - self.state_fit if not terminated else state_fit
+        reward = state_fit
 
         self.state_fit = state_fit  # 跟新 state_fit 记录
 
@@ -206,7 +207,7 @@ def robustness(network: nx.Graph) -> int:
     return len(network.nodes)
 
 
-def evaluation(network: nx.Graph):
+def evaluation(network: nx.Graph, network_size: int):
     """
     评估加边后网络的适应度
     :param network:
@@ -214,7 +215,7 @@ def evaluation(network: nx.Graph):
     """
     res = 0
     # 生成随机攻击序列
-    attack_node_set = list(range(5))
+    attack_node_set = list(range(network_size))
     np.random.shuffle(attack_node_set)
 
     for node in attack_node_set:
@@ -222,7 +223,7 @@ def evaluation(network: nx.Graph):
         network.remove_node(f'G1-{node}')  # 删除攻击节点
         res += robustness(network.copy())  # TODO: 计算鲁棒性
 
-    return res / 5
+    return res / network_size
 
 
 def fitness(network: nx.Graph, l: int, L: int, idx2adj: list, genome: np.ndarray, generation_size: int) -> float:
@@ -241,7 +242,7 @@ def fitness(network: nx.Graph, l: int, L: int, idx2adj: list, genome: np.ndarray
     for i in range(generation_size):  # 随机生成该基因下的多个个体取平均
         network_ = determine(network.copy(), l, L, genome, idx2adj)  # 随机生成一个该基因下的个体
 
-        r = evaluation(network_)  # 对该个体进行评价
+        r = evaluation(network=network_, network_size=len(network_.nodes) // 2)  # 对该个体进行评价
 
         fit += (r - fit) / (i + 1)  # 计算适应度平均值
 
