@@ -37,7 +37,8 @@ class REINFORCE:
         self.policy_net = PolicyNet(state_dim, hidden_dim,
                                     action_dim).to(device)
         self.normal = Normal(action_dim)
-        self.optimizer = torch.optim.Adam(self.policy_net.parameters(), lr=learning_rate)  # 使用Adam优化器
+        self.optimizer = torch.optim.Adam(self.policy_net.parameters(),
+                                          lr=learning_rate)  # 使用Adam优化器
         self.gamma = gamma  # 折扣因子
         self.device = device
 
@@ -62,5 +63,6 @@ class REINFORCE:
             log_prob = self.normal(self.policy_net(state)).log_prob(action) # pi_theata(s, a): 在状态 state 下，action 数据点对应的概率
             G = self.gamma * G + reward
             loss = - log_prob * G
-            loss.backward(retain_graph=True)
+            loss.backward()
+
         self.optimizer.step()  # 梯度下降

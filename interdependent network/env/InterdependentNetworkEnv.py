@@ -56,6 +56,7 @@ class InterdependentNetworkEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
         # 终止条件 episode 达到目标，或者适应度收敛
         terminated = bool(
             self.episode >= 100
+            or state_fit < self.state_fit - 2
             # or not any(action)
             # or reward == 0
             # or abs(state_fit - self.state_fit) < 0.01  # TODO: 不应该以此作为终止条件，需要再考虑一下
@@ -110,21 +111,21 @@ def random_init_genome(l: int, L: int) -> np.ndarray:
     :return:
     """
 
-    fix = np.array([math.sqrt(1 - l / L), math.sqrt(l / L)])
-    genome = np.empty([L, 2])
-
-    for i in range(L):
-        theta = np.random.uniform(0, 1) * 90
-        theta = math.radians(theta)
-        rotate = np.array([
-            [math.cos(theta), -math.sin(theta)],
-            [math.sin(theta), math.cos(theta)]
-        ])
-
-        genome[i] = rotate.dot(fix)
-
-    return genome
-    # return np.full([L, 2], [math.sqrt(1 - l / L), math.sqrt(l / L)])
+    # fix = np.array([math.sqrt(1 - l / L), math.sqrt(l / L)])
+    # genome = np.empty([L, 2])
+    #
+    # for i in range(L):
+    #     theta = np.random.uniform(0, 1) * 90
+    #     theta = math.radians(theta)
+    #     rotate = np.array([
+    #         [math.cos(theta), -math.sin(theta)],
+    #         [math.sin(theta), math.cos(theta)]
+    #     ])
+    #
+    #     genome[i] = rotate.dot(fix)
+    #
+    # return genome
+    return np.full([L, 2], [math.sqrt(1 - l / L), math.sqrt(l / L)])
 
 
 def determine(network: nx.Graph, l: int, L: int, gene: np.ndarray, idx2adj: list) -> nx.Graph:
