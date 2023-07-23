@@ -19,6 +19,7 @@ class PolicyNet(torch.nn.Module):
         x = F.relu(self.fc1(x))
         x = F.relu(self.mid(x))
         return torch.tanh(self.fc2(x))
+    
 
 class Normal(torch.nn.Module):
     def __init__(self, action_dim):
@@ -46,32 +47,6 @@ class REINFORCE:
         action = action_dist.sample()  # 按照概率密度函数生成 state 对应的 action
         return action.numpy()
 
-    # def take_action(self, state):  # 根据动作概率分布随机采样
-    #     state = torch.tensor(state, dtype=torch.float).to(self.device)
-    #     probs = self.policy_net(state)
-    #     action_dist = torch.distributions.Categorical(probs)
-    #     action = action_dist.sample()
-    #     return action.numpy()  # TODO:
-
-    # def update(self, transition_dict):
-    #     reward_list = transition_dict['rewards']
-    #     state_list = transition_dict['states']
-    #     action_list = transition_dict['actions']
-    #
-    #     G = 0
-    #     self.optimizer.zero_grad()
-    #     for i in reversed(range(len(reward_list))):  # 从最后一步算起
-    #         reward = reward_list[i]
-    #         state = torch.tensor([state_list[i]],
-    #                              dtype=torch.float).to(self.device)
-    #         action = torch.tensor([action_list[i]]).view(-1, 1).to(self.device)
-    #         # log_prob = torch.log(self.policy_net(state).gather(1, action))  #TODO:
-    #         log_prob = torch.log(self.policy_net(state).squeeze(0).gather(1, action))
-    #         G = self.gamma * G + reward
-    #         loss = (-log_prob * G).sum()  # 每一步的损失函数
-    #         loss.backward()  # 反向传播计算梯度
-    #     self.optimizer.step()  # 梯度下降
-
     def update(self, transition_dict):
         reward_list = transition_dict['rewards']
         state_list = transition_dict['states']
@@ -87,5 +62,6 @@ class REINFORCE:
             log_prob = self.normal(self.policy_net(state)).log_prob(action) # pi_theata(s, a): 在状态 state 下，action 数据点对应的概率
             G = self.gamma * G + reward
             loss = - log_prob * G
-            loss.backward(retain_graph=True)
+            loss.backward()
+
         self.optimizer.step()  # 梯度下降
