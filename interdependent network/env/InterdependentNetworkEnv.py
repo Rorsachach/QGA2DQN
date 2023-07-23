@@ -15,7 +15,7 @@ class InterdependentNetworkEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
         self.network = network  # 相依网络
         self.G1 = self.network.subgraph([node[0] for node in self.network.nodes.items() if node[0].startswith('G1')])
         self.G2 = self.network.subgraph([node[0] for node in self.network.nodes.items() if node[0].startswith('G2')])
-        self.generation_size = 100  # 种群大小
+        self.generation_size = 10  # 种群大小
 
         self.idx2adj = genome_extraction(self.G1)  # 加边网络侧的空位对应关系
         self.L = len(self.idx2adj)  # 编码长度
@@ -55,7 +55,7 @@ class InterdependentNetworkEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
 
         # 终止条件 episode 达到目标，或者适应度收敛
         terminated = bool(
-            self.episode >= 100
+            self.episode >= 50
             # or not any(action)
             # or reward == 0
             # or abs(state_fit - self.state_fit) < 0.01  # TODO: 不应该以此作为终止条件，需要再考虑一下
@@ -64,7 +64,7 @@ class InterdependentNetworkEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
         # 奖励值：如果适应度增高则 奖励 1，否则不奖励
         # reward = 10 if state_fit >= self.state_fit else -5
         # reward = state_fit - self.state_fit if not terminated else state_fit
-        reward = state_fit
+        reward = 40 if state_fit > self.state_fit else 0
 
         self.state_fit = state_fit  # 跟新 state_fit 记录
 
@@ -110,21 +110,21 @@ def random_init_genome(l: int, L: int) -> np.ndarray:
     :return:
     """
 
-    fix = np.array([math.sqrt(1 - l / L), math.sqrt(l / L)])
-    genome = np.empty([L, 2])
-
-    for i in range(L):
-        theta = np.random.uniform(0, 1) * 90
-        theta = math.radians(theta)
-        rotate = np.array([
-            [math.cos(theta), -math.sin(theta)],
-            [math.sin(theta), math.cos(theta)]
-        ])
-
-        genome[i] = rotate.dot(fix)
-
-    return genome
-    # return np.full([L, 2], [math.sqrt(1 - l / L), math.sqrt(l / L)])
+    # fix = np.array([math.sqrt(1 - l / L), math.sqrt(l / L)])
+    # genome = np.empty([L, 2])
+    #
+    # for i in range(L):
+    #     theta = np.random.uniform(0, 1) * 90
+    #     theta = math.radians(theta)
+    #     rotate = np.array([
+    #         [math.cos(theta), -math.sin(theta)],
+    #         [math.sin(theta), math.cos(theta)]
+    #     ])
+    #
+    #     genome[i] = rotate.dot(fix)
+    #
+    # return genome
+    return np.full([L, 2], [math.sqrt(1 - l / L), math.sqrt(l / L)])
 
 
 def determine(network: nx.Graph, l: int, L: int, gene: np.ndarray, idx2adj: list) -> nx.Graph:
@@ -145,16 +145,26 @@ def determine(network: nx.Graph, l: int, L: int, gene: np.ndarray, idx2adj: list
     length = np.sum(res == 1)  # 统计加边个数
     if length > l:  # 如果加边个数比目标加边个数更多
         """ 随机删除 """
-        idx = np.where(res == 1)  # 获取 1 的位置
-        np.random.shuffle(idx)  # 随机打乱顺序
-        chromosome = np.zeros_like(res)  # 生成 0 数组
-        chromosome[idx[:l]] = res[idx[:l]]  # 将前 l 项进行赋值
+        # idx = np.where(res == 1)[0]  # 获取 1 的位置
+        # np.random.shuffle(idx)  # 随机打乱顺序
+        # chromosome = np.zeros_like(res)  # 生成 0 数组
+        # chromosome[idx[:l]] = res[idx[:l]]  # 将前 l 项进行赋值
+        """ 按照概率高低删除 """
+        idx = np.where(res == 1)[0]
+        idx = sorted(idx, key=lambda i: gene[i][0], reverse=True)
+        chromosome = np.zeros_like(res)
+        chromosome[idx[:l]] = res[idx[:l]]
     else:  # ...更少
         """ 随机添加 """
-        idx = np.where(res == 0)  # 获取 0 的位置
-        np.random.shuffle(idx)  # 随机打乱顺序
-        chromosome = np.ones_like(res)  # 生成 1 数组
-        chromosome[idx[l - length:]] = res[idx[l - length:]]  # 将最后 l - length 项赋值
+        # idx = np.where(res == 0)[0]  # 获取 0 的位置
+        # np.random.shuffle(idx)  # 随机打乱顺序
+        # chromosome = np.ones_like(res)  # 生成 1 数组
+        # chromosome[idx[:l - length]] = res[idx[:l - length]]  # 将最后 l - length 项赋值
+        """ 按照概率高低删除 """
+        idx = np.where(res == 0)[0]
+        idx = sorted(idx, key=lambda i: gene[i][0])
+        chromosome = np.ones_like(res)
+        chromosome[idx[:l - length]] = res[idx[:l - length]]
 
     # 将加边添加到相依网络中
     for idx, bit in enumerate(chromosome):

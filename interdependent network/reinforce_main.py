@@ -1,10 +1,5 @@
-import gym
-import torch
-import torch.nn.functional as F
-import numpy as np
 import matplotlib.pyplot as plt
-from tqdm import tqdm
-import math
+
 
 from REINFORCE import REINFORCE
 import env.InterdependentNetworkEnv as Env
@@ -12,28 +7,22 @@ from DQN import *
 from networks.factory import Factory
 
 
-def modify_action(action: np.ndarray):
-    return [-0.5 * math.pi + i * 0.05 * math.pi for i in action]
-
-
 def preprocess_state(state: np.ndarray):
     return state[:, 0]
 
 
 if __name__ == "__main__":
-    learning_rate = 1e-3
-    num_episodes = 1000
+    # learning_rate = 1e-3
+    learning_rate = 0.5
+    num_episodes = 20000
     hidden_dim = 128
     gamma = 0.98
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device(
         "cpu")
 
     env = Env.InterdependentNetworkEnv(Factory.generate_interdependent_network(), fa=0.2)
-    # env.seed(0)
     torch.manual_seed(0)
 
-    # agent = REINFORCE(2, hidden_dim, 21, learning_rate, gamma,
-    #                   device)
     agent = REINFORCE(env.L, hidden_dim, env.L, learning_rate, gamma, device)
 
     return_list = []
@@ -54,8 +43,6 @@ if __name__ == "__main__":
                 done = False
                 while not done:
                     action = agent.take_action(state)
-                    # real_action = modify_action(action)
-                    # next_state, reward, done, _, info = env.step(real_action)
                     next_state, reward, done, _, info = env.step(action)
                     next_state = preprocess_state(next_state)
                     transition_dict['states'].append(state)
@@ -89,4 +76,5 @@ if __name__ == "__main__":
     plt.xlabel('Episodes')
     plt.ylabel('fitness')
     plt.title('DQN on Independent Networks')
+
     plt.show()
