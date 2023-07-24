@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 
 from REINFORCE import REINFORCE
@@ -14,15 +15,16 @@ def preprocess_state(state: np.ndarray):
 
 if __name__ == "__main__":
     # learning_rate = 1e-3
-    learning_rate = 0.5
-    num_episodes = 20000
+    learning_rate = 0.01
+    num_episodes = 100
     hidden_dim = 128
-    gamma = 0.98
+    gamma = 0.96
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device(
         "cpu")
 
-    env = Env.InterdependentNetworkEnv(Factory.generate_interdependent_network(), fa=0.2)
+    env = Env.InterdependentNetworkEnv(Factory.generate_interdependent_network(), fa=0.3)
     torch.manual_seed(0)
+    np.random.seed(0)
 
     agent = REINFORCE(env.L, hidden_dim, env.L, learning_rate, gamma, device)
     return_list = []
@@ -52,6 +54,7 @@ if __name__ == "__main__":
                     transition_dict['dones'].append(done)
                     state = next_state
                     episode_return += reward
+                # print(state)
                 return_list.append(episode_return)
                 info_list.append(info['fitness'])
                 agent.update(transition_dict)

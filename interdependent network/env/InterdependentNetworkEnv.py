@@ -15,7 +15,7 @@ class InterdependentNetworkEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
         self.network = network  # 相依网络
         self.G1 = self.network.subgraph([node[0] for node in self.network.nodes.items() if node[0].startswith('G1')])
         self.G2 = self.network.subgraph([node[0] for node in self.network.nodes.items() if node[0].startswith('G2')])
-        self.generation_size = 10  # 种群大小
+        self.generation_size = 1000  # 种群大小
 
         self.idx2adj = genome_extraction(self.G1)  # 加边网络侧的空位对应关系
         self.L = len(self.idx2adj)  # 编码长度
@@ -55,7 +55,7 @@ class InterdependentNetworkEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
 
         # 终止条件 episode 达到目标，或者适应度收敛
         terminated = bool(
-            self.episode >= 50
+            self.episode >= 20
             # or state_fit < self.state_fit - 2
             # or not any(action)
             # or reward == 0
@@ -65,7 +65,9 @@ class InterdependentNetworkEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
         # 奖励值：如果适应度增高则 奖励 1，否则不奖励
         # reward = 10 if state_fit >= self.state_fit else -5
         # reward = state_fit - self.state_fit if not terminated else state_fit
-        reward = 40 if state_fit > self.state_fit else 0
+        reward = (state_fit - self.state_fit) * 10
+        if terminated:
+            reward = state_fit - self.base_fit
 
         self.state_fit = state_fit  # 跟新 state_fit 记录
 
@@ -91,10 +93,11 @@ class InterdependentNetworkEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
         self.state = random_init_genome(self.l, self.L)  # 初始化编码
         self.state_fit = fitness(self.network, self.l, self.L, self.idx2adj, self.state, self.generation_size)
         self.episode = 0
+        self.base_fit = init_base_fit(self.network, self.generation_size)
 
         if self.render_mode == "human":
             self.render()
-        return np.array(self.state, dtype=np.float32), {}
+        return np.array(self.state, dtype=np.float32), {"fitness": self.state_fit}
 
     def render(self):
         pass
@@ -125,8 +128,21 @@ def random_init_genome(l: int, L: int) -> np.ndarray:
     #     genome[i] = rotate.dot(fix)
     #
     # return genome
-    return np.full([L, 2], [math.sqrt(1 - l / L), math.sqrt(l / L)])
+    # return np.full([2, L], [math.sqrt(1 - l / L), math.sqrt(l / L)])
+    return np.full([L, 2, 1], [[math.sqrt(1 - l / L)], [math.sqrt(l / L)]])
 
+
+def init_base_fit(network: nx.Graph, generation_size):
+    fit = 0
+    for i in range(generation_size):  # 随机生成该基因下的多个个体取平均
+        r = 0
+        for i in range(10):
+            R = evaluation(network=network.copy(), network_size=len(network.nodes) // 2)  # 对该个体进行评价
+            r += R
+
+        r /= 10
+        fit += (r - fit) / (i + 1)  # 计算适应度平均值
+    return fit
 
 def determine(network: nx.Graph, l: int, L: int, gene: np.ndarray, idx2adj: list) -> nx.Graph:
     """
@@ -252,11 +268,14 @@ def fitness(network: nx.Graph, l: int, L: int, idx2adj: list, genome: np.ndarray
 
     for i in range(generation_size):  # 随机生成该基因下的多个个体取平均
         network_ = determine(network.copy(), l, L, genome, idx2adj)  # 随机生成一个该基因下的个体
-
         r = evaluation(network=network_, network_size=len(network_.nodes) // 2)  # 对该个体进行评价
-
+        # r = 0
+        # for i in range(10):
+        #     R = evaluation(network=network_.copy(), network_size=len(network_.nodes) // 2)  # 对该个体进行评价
+        #     r += R
+        #
+        # r /= 10
         fit += (r - fit) / (i + 1)  # 计算适应度平均值
-
     return fit
 
 
