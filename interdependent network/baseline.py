@@ -1,3 +1,7 @@
+import random
+import matplotlib.pyplot as plt
+from tqdm import tqdm
+
 import numpy as np
 import networkx as nx
 import math
@@ -110,7 +114,7 @@ def getTheta(qubit, bit, b, flag) -> float:
         else:
             if s > 0: return 0.025 * np.pi
             elif s < 0 or qubit[1] == 0: return -0.025 * np.pi
-    elif bit == 1 and b == 0:
+    elif bit == 1 and b == 1:
         if not flag:
             if s > 0: return 0.025 * np.pi
             elif s < 0 or qubit[1] == 0: return -0.025 * np.pi
@@ -133,67 +137,128 @@ def rotate(Population, Solutions, maxSolution, Fitnesses, maxFitness):
 
             Population[i] = r.dot(Population[i])
 
+    return Population
+
+
+# def migration(tmp, Elite_Population, Populations):
+#     tmp.sort(key=lambda a: a[0], reverse=True)
+#     Elite_Population.append(tmp[0])
+#
+#     if len(Elite_Population) > m:
+#         populations = random.sample(Elite_Population, m)
+#         for i in range(m):
+#             if tmp_Population[i][0] < populations[i][0]:
+#                 Populations[i] = populations[i][1]
+
 
 if __name__ == "__main__":
-    network = Factory.generate_interdependent_network()
+    """ 生成相依网络 """
+    network = Factory.generate_interdependent_network(40)
+    # 取出加边侧网络
     G1 = network.subgraph([node[0] for node in network.nodes.items() if node[0].startswith('G1')])
+    # 取出相依侧网络
     G2 = network.subgraph([node[0] for node in network.nodes.items() if node[0].startswith('G2')])
 
-    Elite_Population = []
-    Elite_Solution = []
+    """ 初始化部分 """
+    Elite_Population = []  # 用于存储精英染色体库
+    Elite_Solution = []  # 用于存储精英解库
 
-    AdjMatrix_initial = np.array(nx.adjacency_matrix(G1).todense())
-    idx2adj = getIndex(AdjMatrix_initial)
+    AdjMatrix_initial = np.array(nx.adjacency_matrix(G1).todense())  # 初始邻接矩阵
+    idx2adj = getIndex(AdjMatrix_initial)  #
 
-    L = len(idx2adj)
-    l = round(L * 0.6)
+    L = len(idx2adj)  # 可加边网络位置
+    l = round(L * 0.2)  # 实际加边个数
 
-    m = 3
-    Q = 100
-    iter_max = 200
+    m = 3  # 种群数量
+    Q = 100  # 种群空间大小
+    iter_max = 200  # 最大迭代次数
 
-    lmbda = [0.0001, 0.00015, 0.0002]
+    lmbda = [0.0001, 0.00015, 0.0002]  # 编译概率
+    np.random.seed(0)
 
-    Populations = []
+    Populations = []  # 用于存放染色体
+    episodes_list = []
 
     for _ in range(m):
-        Population = init_population(l, L)
-        Populations.append(Population)
+        Population = init_population(l, L)  # 生成初代染色体空间
+        Populations.append(Population)  # 保存初代染色体空间
+        # 转化解空间，并计算解空间适应度
         fitnesses = []
-        Solutions = []
+        solutions = []
         for _ in range(Q):
-            Solution = randomSolution(l, L, Population)
-            Solutions.append(Solution)
-            fitness = getFitness(network.copy(), Solution, idx2adj)
+            solution = randomSolution(l, L, Population)
+            solutions.append(solution)
+            fitness = getFitness(network.copy(), solution, idx2adj)
             fitnesses.append(fitness)
 
-        max_fitnesses_idx = sorted(range(Q), key=lambda k: fitnesses[k], reverse=True)[0]
-        Elite_Solution.append((fitnesses[max_fitnesses_idx], Solutions[max_fitnesses_idx]))
-        Elite_Population.append((fitnesses[max_fitnesses_idx], Population))
+        elite_solution = sorted(range(Q), key=lambda k: fitnesses[k], reverse=True)[0]  # 获取当前种群的最有个体
+        Elite_Solution.append(
+            {
+                'fitness': fitnesses[elite_solution],
+                'solution': solutions[elite_solution],
+            })  # 将最优个体保存到精英解库
 
-    for episode in range(iter_max):
-        for i in range(m):
-            Population = Populations[i]
-            fitnesses = []
-            Solutions = []
-            for _ in range(Q):
-                Solution = randomSolution(l, L, Population)
-                Solutions.append(Solution)
-                fitness = getFitness(network.copy(), Solution, idx2adj)
-                fitnesses.append(fitness)
+    elite_population = sorted(range(m), key=lambda k: Elite_Solution[k]['fitness'], reverse=True)[0]
+    Elite_Population.append(
+        {
+            'fitness': Elite_Solution[elite_population]['fitness'],
+            'solution': Elite_Solution[elite_population]['solution'],
+            'population': Populations[elite_population]
+        })  # 添加精英染色体
 
-            max_fitnesses_idx = sorted(range(Q), key=lambda k: fitnesses[k], reverse=True)[0]
-            Elite_Solution.append((fitnesses[max_fitnesses_idx], Solutions[max_fitnesses_idx]))
-            Elite_Population.append((fitnesses[max_fitnesses_idx], Population))
 
-            rotate(Population, Solutions, Solutions[max_fitnesses_idx], fitnesses, fitnesses[max_fitnesses_idx])
 
-            p = lmbda[i] * (iter_max - episode)
+    with tqdm(total=int(iter_max)) as pbar:
+        for episode in range(iter_max):
+            for i in range(m):
+                Population = Populations[i]
+                fitnesses = []
+                solutions = []
+                for _ in range(Q):
+                    solution = randomSolution(l, L, Population)
+                    solutions.append(solution)
+                    fitness = getFitness(network.copy(), solution, idx2adj)
+                    fitnesses.append(fitness)
 
-            for idx in range(L):
-                if np.random.uniform(0, 1) < p:
-                    Population[idx][0], Population[idx][1] = Population[idx][1], Population[idx][0]
+                rotate(Population, solutions, Elite_Solution[i]['solution'], fitnesses, Elite_Solution[i]['fitness'])
 
-            print(Population)
+                elite_solution = sorted(range(Q), key=lambda k: fitnesses[k], reverse=True)[0]
+                if fitnesses[elite_solution] > Elite_Solution[i]['fitness']:
+                    Elite_Solution[i]['fitness'] = fitnesses[elite_solution]
+                    Elite_Solution[i]['solution'] = solutions[elite_solution]
 
+                """ 变异 """
+                p = lmbda[i] * (iter_max - episode)
+                for idx in range(L):
+                    if np.random.uniform(0, 1) < p:
+                        tmp = Population[idx][0].copy()
+                        Population[idx][0] = Population[idx][1]
+                        Population[idx][1] = tmp
+
+            # tmp_Population.sort(key=lambda a: a[0], reverse=True)
+            # Elite_Population.append(tmp_Population[0])
+            #
+            # if len(Elite_Population) > m:
+            #     populations = random.sample(Elite_Population, m)
+            #     for i in range(m):
+            #         if tmp_Population[i][0] < populations[i][0]:
+            #             Populations[i] = populations[i][1]
+
+            # Elite_Solution.sort(key=lambda a: a[0], reverse=True)
+            # print(Elite_Solution[0])
+            episodes_list.append(max(Elite_Solution, key=lambda a: a['fitness'])['fitness'])
+
+            if (episode + 1) % 10 == 0:
+                pbar.set_postfix({
+                    'episode': '%d' % (episode + 1),
+                    'return': '%.3f' % episodes_list[episode]
+                })
+            pbar.update(1)
+
+    print(Populations)
+
+    plt.plot(list(range(iter_max)), episodes_list)
+    plt.xlabel('Episodes')
+    plt.ylabel('fitness')
+    plt.show()
 
