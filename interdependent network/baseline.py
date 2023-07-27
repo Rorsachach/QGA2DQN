@@ -153,7 +153,7 @@ def rotate(Population, Solutions, maxSolution, Fitnesses, maxFitness):
 
 if __name__ == "__main__":
     """ 生成相依网络 """
-    network = Factory.generate_interdependent_network(40)
+    network = Factory.generate_interdependent_network(100)
     # 取出加边侧网络
     G1 = network.subgraph([node[0] for node in network.nodes.items() if node[0].startswith('G1')])
     # 取出相依侧网络
