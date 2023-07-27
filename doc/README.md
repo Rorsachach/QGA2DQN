@@ -59,3 +59,74 @@ $$
 - 奖励函数$r$：每一步操作都以适应度变化作为奖励值，即$fitness(G’) – fitness(G)$
 折扣因子\gamma：以0.96作为折扣因子使用。
 
+
+
+
+输入：当前量子遗传编码 gene, 可选择加边数量l，所有可选择的位置数L
+solution=L¬
+For i=1:L
+  If random\left(0,1\right)<gene\left[i,\ \ 0\right]^2
+    solution\left[i\right]=0
+  Else
+    solution\left[i\right]=1
+  End
+End
+If len(find(solution==1))>1¬
+  按照gene[:,0]从高到低排序，并按照排序将solution¬中的l_{find}-l个对应位置置为0
+Else
+  按照gene[:,0]从低到高排序，并按照排序将solution¬中的l-l_{find}个对应位置置为1
+End
+输出：solution
+
+输入：量子遗传编码 gene，当前网络 network
+fitness=0
+For i=1:100
+  通过表1来获取gene对应的一个确定个体solution
+  tmp=0
+  For j=1:100
+    attackNodeList\ =\ shuffle\left(1:N\right)
+    R\ =\ 0
+For q=1:N
+  network\ -=\ attackNodeList\left[q\right]
+  R\ +=\ s\left(q\right)
+End
+    tmp\ +=\ R\ /\ 100
+End
+  fitness\ +=\ tmp\ /\ 100
+End 
+fitness\ =\ fitness\ /\ 100
+输出：fitness
+
+输入：执行动作action
+episode\ +=\ 1
+new\ state\ =\ action\cdot state
+通过表2计算new\ state的fitness
+reward=fitness\left(newstate\right)–fitnessstate
+terminated=bool\left(episode>200\right)
+state\ =\ new\ state
+输出：下一状态 state, 奖励值 reward，是否终止done
+
+输入：相依网络 network
+初始化环境 env
+初始化Agent\ agnet
+For episode\ =\ 1:100
+初始状态 state=env.reset
+\ \ \ \ States=list
+\ \ \ \ Actions\ =\ list
+\ \ \ \ Rewards\ =\ list
+For done
+  Agent 通过当前环境状态 state 做出动作决策 action
+  Next\ state,reward,done\ =\ env.step\left(action\right)
+  记录 state,\ action,\ next\ state,\ reward
+End 
+使用这一次随机采样对来对agent进行更新
+\ \ \ \ G\ =\ 0
+For i=len\left(states\right):1
+  计算当前状态累计收益: G\ =\ gamma\ \ast\ G\ +\ reward
+  计算当前状态state下决策出对应action的概率点对数logprob
+  Loss\ =\ -logprob\ \ast\ G
+  计算梯度
+End
+进行梯度下降
+End
+
