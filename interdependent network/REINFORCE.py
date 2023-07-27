@@ -30,8 +30,8 @@ class Normal(torch.nn.Module):
         upper_bound = 0.05 * np.pi
 
     def forward(self, x):
-        return torch.distributions.Normal(loc=x, scale=0.01)
-        # return torch.distributions.MultivariateNormal(loc=x * 0.005 * np.pi, covariance_matrix=self.stds)  # 生成一个策略概率密度函数
+        # return torch.distributions.Normal(loc=x, scale=0.01)
+        return torch.distributions.MultivariateNormal(loc=x * 0.005 * np.pi, covariance_matrix=self.stds)  # 生成一个策略概率密度函数
         # normal_dist = torch.distributions.MultivariateNormal(loc=x * 0.05 * np.pi, covariance_matrix=self.stds)
         # return torch.distributions.tr
 
@@ -66,7 +66,7 @@ class REINFORCE:
             state = torch.tensor(np.array(state_list[i]), dtype=torch.float).squeeze(dim=1).to(self.device)
             action = torch.tensor(np.array(action_list[i])).to(self.device)
             # 按照概率
-            log_prob = self.normal(self.policy_net(state)).log_prob(action).sum()  # pi_theata(s, a): 在状态 state 下，action 数据点对应的概率
+            log_prob = self.normal(self.policy_net(state)).log_prob(action)  # pi_theata(s, a): 在状态 state 下，action 数据点对应的概率
             G = self.gamma * G + reward
             loss = - log_prob * G
             loss.backward()
