@@ -1,12 +1,15 @@
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 from tqdm import tqdm
 import math
 
 from PPO import PPO
 import env.InterdependentNetworkEnv as Env
 from networks.factory import Factory
+
+import gym
 
 
 def modify_action(action: np.ndarray):
@@ -20,7 +23,7 @@ def preprocess_state(state: np.ndarray):
 if __name__ == "__main__":
     actor_lr = 1e-3
     critic_lr = 1e-2
-    num_episodes = 500
+    num_episodes = 1000
     hidden_dim = 128
     gamma = 0.98
     lmbda = 0.95
@@ -29,13 +32,14 @@ if __name__ == "__main__":
     device = torch.device("cuda") if torch.cuda.is_available() else torch.device(
         "cpu")
 
-    env = Env.InterdependentNetworkEnv(Factory.generate_interdependent_network(), fa=0.2)
+    env = Env.InterdependentNetworkEnv(Factory.generate_interdependent_network(5), fa=0.2)
     torch.manual_seed(0)
 
     agent = PPO(env.L, hidden_dim, env.L, actor_lr, critic_lr, lmbda, epochs, eps, gamma, device)
 
     return_list = []
     info_list = []
+    mean_list = []
     for i in range(10):
         with tqdm(total=int(num_episodes / 10), desc='Iteration %d' % i) as pbar:
             for i_episode in range(int(num_episodes / 10)):
@@ -61,9 +65,11 @@ if __name__ == "__main__":
                     transition_dict['dones'].append(done)
                     state = next_state
                     episode_return += reward
+                # print(state)
                 return_list.append(episode_return)
                 info_list.append(info['fitness'])
                 agent.update(transition_dict)
+                mean_list.append(np.mean(return_list[-10:]))
                 if (i_episode + 1) % 10 == 0:
                     pbar.set_postfix({
                         'episode':
@@ -72,17 +78,29 @@ if __name__ == "__main__":
                             '%.3f' % np.mean(return_list[-10:])
                     })
                 pbar.update(1)
-
+                # print(state)
     episodes_list = list(range(len(return_list)))
-    plt.plot(episodes_list, return_list)
+    sns.set()
+    sns.lineplot(data=mean_list)
+    # plt.plot(episodes_list, return_list)
     plt.xlabel('Episodes')
     plt.ylabel('Returns')
     plt.title('DQN on Independent Networks')
     plt.show()
 
+    # episodes_list = list(range(len(return_list)))
+    # plt.plot(episodes_list, return_list)
+    # plt.xlabel('Episodes')
+    # plt.ylabel('Returns')
+    # plt.title('DQN on Independent Networks')
+    # plt.show()
+    #
     episodes_list = list(range(len(info_list)))
-    plt.plot(episodes_list, info_list)
+    # plt.plot(episodes_list, info_list)
+    sns.lineplot(data=info_list)
     plt.xlabel('Episodes')
     plt.ylabel('fitness')
     plt.title('DQN on Independent Networks')
     plt.show()
+
+    print(env.base_fit)

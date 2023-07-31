@@ -1,4 +1,5 @@
 import math
+import torch
 
 import gym
 from gym import spaces
@@ -15,7 +16,7 @@ class InterdependentNetworkEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
         self.network = network  # 相依网络
         self.G1 = self.network.subgraph([node[0] for node in self.network.nodes.items() if node[0].startswith('G1')])
         self.G2 = self.network.subgraph([node[0] for node in self.network.nodes.items() if node[0].startswith('G2')])
-        self.generation_size = 1000  # 种群大小
+        self.generation_size = 200  # 种群大小
 
         self.idx2adj = genome_extraction(self.G1)  # 加边网络侧的空位对应关系
         self.L = len(self.idx2adj)  # 编码长度
@@ -27,6 +28,7 @@ class InterdependentNetworkEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
         self.state_fit = 0  # 适应度
 
         self.p = p  # 随机攻击保留的节点数量
+        self.lmbda = 0.0001
 
         self.observation_space = spaces.Sequence(spaces.Box(np.array([0, 0]), np.array([1, 1])))
         self.action_space = spaces.Sequence(spaces.Discrete(21, start=-10))
@@ -43,12 +45,22 @@ class InterdependentNetworkEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
         self.episode += 1  # 回合次数 + 1
 
         for idx, theta in enumerate(action):  # 执行 action，进行状态转移
+            if theta > 0.1 * torch.pi:
+                theta = 0.1 * torch.pi
+            elif theta < -0.1 * torch.pi:
+                theta = -0.1 * torch.pi
             rotate = np.array([
                 [math.cos(theta), -math.sin(theta)],
                 [math.sin(theta), math.cos(theta)]
             ])
 
             self.state[idx] = rotate.dot(self.state[idx])
+            # 变异操作
+            # if np.random.uniform(0, 1) < self.lmbda:
+            #     tmp = self.state[idx][0]
+            #     self.state[idx][0] = self.state[idx][1]
+            #     self.state[idx][1] = tmp
+
 
         # 计算新状态的适应度
         state_fit = fitness(self.network, self.l, self.L, self.idx2adj, self.state, self.generation_size)
@@ -56,6 +68,7 @@ class InterdependentNetworkEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
         # 终止条件 episode 达到目标，或者适应度收敛
         terminated = bool(
             self.episode >= 20
+            # or state_fit < self.state_fit - 0.02
             # or state_fit < self.state_fit - 2
             # or not any(action)
             # or reward == 0
@@ -65,9 +78,10 @@ class InterdependentNetworkEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
         # 奖励值：如果适应度增高则 奖励 1，否则不奖励
         # reward = 10 if state_fit >= self.state_fit else -5
         # reward = state_fit - self.state_fit if not terminated else state_fit
-        reward = (state_fit - self.state_fit) * 10
-        if terminated:
-            reward = state_fit - self.base_fit
+        reward = (state_fit + 0.02 - self.state_fit) if not terminated else state_fit * 10
+
+        # if terminated:
+        #     reward = state_fit - self.base_fit
 
         self.state_fit = state_fit  # 跟新 state_fit 记录
 
@@ -93,7 +107,8 @@ class InterdependentNetworkEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
         self.state = random_init_genome(self.l, self.L)  # 初始化编码
         self.state_fit = fitness(self.network, self.l, self.L, self.idx2adj, self.state, self.generation_size)
         self.episode = 0
-        self.base_fit = init_base_fit(self.network, self.generation_size)
+        # self.base_fit = init_base_fit(self.network, self.generation_size)
+        self.base_fit = self.state_fit
 
         if self.render_mode == "human":
             self.render()
@@ -142,7 +157,7 @@ def init_base_fit(network: nx.Graph, generation_size):
 
         r /= 10
         fit += (r - fit) / (i + 1)  # 计算适应度平均值
-    return fit
+    return round(fit, 4)
 
 def determine(network: nx.Graph, l: int, L: int, gene: np.ndarray, idx2adj: list) -> nx.Graph:
     """
@@ -248,7 +263,7 @@ def evaluation(network: nx.Graph, network_size: int):
     for node in attack_node_set:
         network.remove_node(network.nodes[f'G1-{node}']['inter_node'])  # 删除攻击节点的相依节点
         network.remove_node(f'G1-{node}')  # 删除攻击节点
-        res += robustness(network.copy())  # TODO: 计算鲁棒性
+        res += robustness(network.copy()) / (network_size * 2)  # TODO: 计算鲁棒性
 
     return res / network_size
 
@@ -276,6 +291,7 @@ def fitness(network: nx.Graph, l: int, L: int, idx2adj: list, genome: np.ndarray
         #
         # r /= 10
         fit += (r - fit) / (i + 1)  # 计算适应度平均值
+        # fit = max(fit,  r)
     return fit
 
 
