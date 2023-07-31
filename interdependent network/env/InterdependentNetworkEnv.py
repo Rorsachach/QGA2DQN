@@ -52,10 +52,12 @@ class InterdependentNetworkEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
 
         # 计算新状态的适应度
         state_fit = fitness(self.network, self.l, self.L, self.idx2adj, self.state, self.generation_size)
+        reward = state_fit if state_fit < self.state_fit else state_fit - self.state_fit
 
         # 终止条件 episode 达到目标，或者适应度收敛
         terminated = bool(
             self.episode >= 50
+            or state_fit < self.state_fit
             # or state_fit < self.state_fit - 2
             # or not any(action)
             # or reward == 0
@@ -65,7 +67,7 @@ class InterdependentNetworkEnv(gym.Env[np.ndarray, Union[int, np.ndarray]]):
         # 奖励值：如果适应度增高则 奖励 1，否则不奖励
         # reward = 10 if state_fit >= self.state_fit else -5
         # reward = state_fit - self.state_fit if not terminated else state_fit
-        reward = 40 if state_fit > self.state_fit else 0
+        # reward = 40 if state_fit > self.state_fit else 0
 
         self.state_fit = state_fit  # 跟新 state_fit 记录
 
@@ -232,7 +234,7 @@ def evaluation(network: nx.Graph, network_size: int):
     for node in attack_node_set:
         network.remove_node(network.nodes[f'G1-{node}']['inter_node'])  # 删除攻击节点的相依节点
         network.remove_node(f'G1-{node}')  # 删除攻击节点
-        res += robustness(network.copy())  # TODO: 计算鲁棒性
+        res += robustness(network.copy()) / network_size  # TODO: 计算鲁棒性
 
     return res / network_size
 

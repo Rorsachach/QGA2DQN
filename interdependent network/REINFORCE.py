@@ -8,7 +8,9 @@ class PolicyNet(torch.nn.Module):
     def __init__(self, state_dim, hidden_dim, action_dim):
         super(PolicyNet, self).__init__()
         self.fc1 = torch.nn.Linear(state_dim, hidden_dim)
-        self.mid = torch.nn.Linear(hidden_dim, hidden_dim)
+        self.mid1 = torch.nn.Linear(hidden_dim, hidden_dim)
+        self.mid2 = torch.nn.Linear(hidden_dim, hidden_dim)
+        self.mid3 = torch.nn.Linear(hidden_dim, hidden_dim)
         self.fc2 = torch.nn.Linear(hidden_dim, action_dim)
 
     def forward(self, x):
@@ -17,17 +19,19 @@ class PolicyNet(torch.nn.Module):
         :return: 输出正太分布的平均值
         """
         x = F.relu(self.fc1(x))
-        x = F.relu(self.mid(x))
+        x = F.relu(self.mid1(x))
+        x = F.relu(self.mid2(x))
+        x = F.relu(self.mid3(x))
         return torch.tanh(self.fc2(x))
     
 
 class Normal(torch.nn.Module):
     def __init__(self, action_dim):
         super().__init__()
-        self.stds = torch.nn.Parameter(torch.eye(action_dim) * 0.1)
+        self.stds = torch.nn.Parameter(torch.eye(action_dim) * 0.2)
 
     def forward(self, x):
-        return torch.distributions.MultivariateNormal(loc=x * 0.05 * math.pi, covariance_matrix=self.stds)  # 生成一个策略概率密度函数
+        return torch.distributions.MultivariateNormal(loc=x * 0.5 * math.pi, covariance_matrix=self.stds)  # 生成一个策略概率密度函数
 
 
 class REINFORCE:
