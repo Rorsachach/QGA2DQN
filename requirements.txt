@@ -1,0 +1,6 @@
+numpy~=1.25.0
+gym~=0.26.1
+networkx~=2.8.4
+tqdm~=4.65.0
+matplotlib~=3.7.1
+seaborn~=0.12.2
